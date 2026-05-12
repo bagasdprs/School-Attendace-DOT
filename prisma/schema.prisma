@@ -1,0 +1,105 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  STUDENT
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  EXCUSED
+}
+
+model User {
+  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  email     String    @unique @db.VarChar(255)
+  password  String    @db.VarChar(255) // Hashed
+  name      String    @db.VarChar(255)
+  role      UserRole  @default(STUDENT)
+  studentId BigInt?   @unique @db.UnsignedBigInt
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  student Student? @relation(fields: [studentId], references: [id])
+
+  @@map("users")
+}
+
+model Student {
+  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  nis       String    @unique @db.VarChar(20)
+  name      String    @db.VarChar(255)
+  email     String    @unique @db.VarChar(255)
+  classId   BigInt    @db.UnsignedBigInt
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Relasi
+  class       Class        @relation(fields: [classId], references: [id])
+  attendances Attendance[]
+  user        User?
+
+  @@index([classId])
+  @@map("students")
+}
+
+model Class {
+  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name         String    @unique @db.VarChar(100)
+  academicYear String    @db.VarChar(9) // "2024/2025"
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  students Student[]
+
+  @@map("classes")
+}
+
+model AttendanceSetting {
+  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name          String    @db.VarChar(255)
+  checkInTime   String    @db.VarChar(5) // "07:00"
+  checkOutTime  String    @db.VarChar(5) // "15:00"
+  lateThreshold Int       @default(15) // menit
+  isActive      Boolean   @default(false)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  @@map("attendance_settings")
+}
+
+model Attendance {
+  id           BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  studentId    BigInt           @db.UnsignedBigInt
+  date         DateTime         @db.Date
+  checkInTime  DateTime?
+  checkOutTime DateTime?
+  status       AttendanceStatus @default(ABSENT)
+  notes        String?          @db.Text
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+  deletedAt    DateTime?        @map("deleted_at")
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, date])
+  @@index([studentId])
+  @@index([date])
+  @@map("attendances")
+}
