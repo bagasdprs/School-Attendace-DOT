@@ -20,3 +20,20 @@ export interface TClassRecapResponse {
   classSummary: TRecapSummary;
   students: TStudentRecapResponse[];
 }
+
+export interface TStudentRecap {
+  studentId: string;
+  studentName: string;
+  totalPresent: number;
+  totalLate: number;
+  totalExcused: number;
+  totalAbsent: number;
+  attendancePercentage: number;
+}
+
+export interface TOverallClassRecapResponse {
+  overallPercentage: number;
+  grandTotalAbsent: number;
+  grandTotalLate: number;
+  students: TStudentRecap[];
+}

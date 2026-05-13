@@ -4,6 +4,7 @@ import { AttendanceStatus } from "@prisma/client";
 
 export const GetAttendancesQuerySchema = BaseQuerySchema.extend({
   studentId: z.coerce.bigint().optional(),
+  classId: z.coerce.bigint().optional(),
   date: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD")

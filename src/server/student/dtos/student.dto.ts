@@ -26,8 +26,10 @@ export const StudentDTO = {
       nis: student.nis,
       name: student.name,
       email: student.email,
-      classId: student.classId.toString(),
-      className: student.class?.name,
+      classId: student.classId?.toString(),
+      className: student.class?.name || null,
+      // classId: student.classId.toString(),
+      // className: student.class?.name,
       createdAt: student.createdAt.toISOString(),
     };
   },

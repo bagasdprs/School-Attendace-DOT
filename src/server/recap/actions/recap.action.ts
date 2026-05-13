@@ -7,6 +7,7 @@ import { NotFoundException } from "@/errors/base.exception";
 import { serverCheckPermission } from "@/common/utils/server-check-permission";
 import { PERMISSIONS } from "@/common/enum/permission.enum";
 import { AttendanceStatus } from "@prisma/client";
+import { prismaActive } from "@/libs/prisma/prisma";
 
 const calculateSummary = (attendances: { status: AttendanceStatus }[]): TRecapSummary => {
   let present = 0;
@@ -36,15 +37,25 @@ const calculateSummary = (attendances: { status: AttendanceStatus }[]): TRecapSu
 };
 
 export const getStudentRecapAction = async (input: TGetStudentRecapInput): Promise<TStudentRecapResponse> => {
-  await serverCheckPermission([PERMISSIONS.VIEW_RECAP]); // [cite: 142]
+  const session = await serverCheckPermission([PERMISSIONS.VIEW_RECAP]);
 
-  const student = await RecapRepository.getStudentInfo(input.studentId);
+  let targetStudentId = input.studentId;
+
+  // 🚨 LOGIKA ISOLASI: Jika dia STUDENT, paksa gunakan studentId miliknya sendiri
+  if (session.role === "STUDENT") {
+    const user = await prismaActive.user.findUnique({ where: { id: BigInt(session.userId) } });
+    if (user?.studentId) {
+      targetStudentId = user.studentId;
+    }
+  }
+
+  const student = await RecapRepository.getStudentInfo(targetStudentId);
   if (!student) throw new NotFoundException("Data siswa tidak ditemukan");
 
   const start = new Date(input.startDate);
   const end = new Date(input.endDate);
 
-  const attendances = await RecapRepository.getStudentAttendances(input.studentId, start, end, input.status);
+  const attendances = await RecapRepository.getStudentAttendances(targetStudentId, start, end, input.status);
   const summary = calculateSummary(attendances);
 
   return {
@@ -56,16 +67,53 @@ export const getStudentRecapAction = async (input: TGetStudentRecapInput): Promi
 };
 
 export const getClassRecapAction = async (input: TGetClassRecapInput): Promise<TClassRecapResponse> => {
-  await serverCheckPermission([PERMISSIONS.VIEW_RECAP]); // [cite: 142]
+  const session = await serverCheckPermission([PERMISSIONS.VIEW_RECAP]);
 
-  const classData = await RecapRepository.getClassInfo(input.classId);
-  if (!classData) throw new NotFoundException("Data kelas tidak ditemukan");
+  let targetClassId = input.classId;
+  let studentsWithAttendances: any[] = [];
+  let classData = { id: BigInt(0), name: "-" };
 
   const start = new Date(input.startDate);
   const end = new Date(input.endDate);
 
-  const studentsWithAttendances = await RecapRepository.getClassWithAttendances(input.classId, start, end, input.status);
+  // 🚨 LOGIKA ISOLASI DAN PERCABANGAN ROLE
+  if (session.role === "STUDENT") {
+    // A. JIKA SISWA: Cari tahu kelasnya secara otomatis dan ambil datanya saja
+    const user = await prismaActive.user.findUnique({
+      where: { id: BigInt(session.userId) },
+      include: { student: { include: { class: true } } },
+    });
 
+    if (user?.studentId && user?.student?.classId) {
+      targetClassId = user.student.classId;
+      classData = { id: targetClassId, name: user.student.class?.name || "Kelas" };
+
+      const rawData = await RecapRepository.getClassWithAttendances(targetClassId, start, end, input.status);
+
+      // Filter array-nya! Buang semua siswa lain, sisakan data miliknya sendiri
+      studentsWithAttendances = rawData.filter((student) => student.id === user.studentId);
+    }
+  } else {
+    // B. JIKA ADMIN: Pengecekan classId normal
+    if (!targetClassId) {
+      // Kembalikan data default jika filter Kelas belum dipilih Admin
+      return {
+        classId: "",
+        className: "-",
+        period: `${input.startDate} - ${input.endDate}`,
+        classSummary: calculateSummary([]),
+        students: [],
+      };
+    }
+
+    const dbClass = await RecapRepository.getClassInfo(targetClassId);
+    if (!dbClass) throw new NotFoundException("Data kelas tidak ditemukan");
+    classData = dbClass;
+
+    studentsWithAttendances = await RecapRepository.getClassWithAttendances(targetClassId, start, end, input.status);
+  }
+
+  // 4. Kalkulasi Summary Berdasarkan Array yang Sudah Difilter
   let classTotalAttendances: { status: AttendanceStatus }[] = [];
   const studentsSummary: TStudentRecapResponse[] = studentsWithAttendances.map((student) => {
     classTotalAttendances = classTotalAttendances.concat(student.attendances);
@@ -87,8 +135,9 @@ export const getClassRecapAction = async (input: TGetClassRecapInput): Promise<T
 };
 
 export const exportClassRecapAction = async (input: TGetClassRecapInput): Promise<string> => {
-  await serverCheckPermission([PERMISSIONS.EXPORT_RECAP]); // [cite: 142]
+  await serverCheckPermission([PERMISSIONS.EXPORT_RECAP]);
 
+  // Ini akan otomatis ter-isolasi karena memanggil getClassRecapAction yang sudah dilindungi di atas
   const data = await getClassRecapAction(input);
 
   let csv = `Laporan Kehadiran Kelas ${data.className}\n`;

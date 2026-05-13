@@ -7,6 +7,76 @@ import { BadRequestException, NotFoundException } from "@/errors/base.exception"
 import { serverCheckPermission } from "@/common/utils/server-check-permission";
 import { PERMISSIONS } from "@/common/enum/permission.enum";
 import { prismaActive } from "@/libs/prisma/prisma";
+import bcrypt from "bcrypt";
+// import { Role } from "@prisma/client";
+
+// export const getDashboardSummaryAction = async () => {
+//   await serverCheckPermission([PERMISSIONS.VIEW_STUDENT]);
+
+//   const today = new Date();
+//   today.setHours(0, 0, 0, 0);
+
+//   const [totalStudents, totalAbsentOrExcused, totalLate] = await Promise.all([
+//     prismaActive.student.count(),
+//     prismaActive.attendance.count({
+//       where: {
+//         date: today,
+//         status: { in: ["ABSENT", "EXCUSED"] },
+//       },
+//     }),
+//     prismaActive.attendance.count({
+//       where: {
+//         date: today,
+//         status: "LATE",
+//       },
+//     }),
+//   ]);
+
+//   return {
+//     totalStudents,
+//     totalAbsentOrExcused,
+//     totalLate,
+//   };
+// };
+export const getDashboardSummaryAction = async () => {
+  const session = await serverCheckPermission([PERMISSIONS.VIEW_STUDENT]);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // LOGIKA ISOLASI: Jika dia STUDENT, hitung statistik khusus untuk dia saja
+  if (session.role === "STUDENT") {
+    // Ambil studentId dari user yang login
+    const user = await prismaActive.user.findUnique({ where: { id: BigInt(session.userId) } });
+    const studentId = user?.studentId;
+
+    if (!studentId) return { totalStudents: 0, totalAbsentOrExcused: 0, totalLate: 0 };
+
+    // Hitung absensi HANYA untuk studentId ini (misal dalam sebulan terakhir)
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    const [myTotalPresent, myTotalAbsent, myTotalLate] = await Promise.all([
+      prismaActive.attendance.count({ where: { studentId, date: { gte: startOfMonth }, status: "PRESENT" } }),
+      prismaActive.attendance.count({ where: { studentId, date: { gte: startOfMonth }, status: { in: ["ABSENT", "EXCUSED"] } } }),
+      prismaActive.attendance.count({ where: { studentId, date: { gte: startOfMonth }, status: "LATE" } }),
+    ]);
+
+    return {
+      totalStudents: myTotalPresent, // Ubah label di UI Frontend nanti jadi "Kehadiran Bulan Ini"
+      totalAbsentOrExcused: myTotalAbsent,
+      totalLate: myTotalLate,
+    };
+  }
+
+  // Jika ADMIN, jalankan kode lama (hitung seluruh sekolah)
+  const [totalStudents, totalAbsentOrExcused, totalLate] = await Promise.all([
+    prismaActive.student.count(),
+    prismaActive.attendance.count({ where: { date: today, status: { in: ["ABSENT", "EXCUSED"] } } }),
+    prismaActive.attendance.count({ where: { date: today, status: "LATE" } }),
+  ]);
+
+  return { totalStudents, totalAbsentOrExcused, totalLate };
+};
 
 export const getStudentsAction = async (query: TGetStudentsQuery) => {
   await serverCheckPermission([PERMISSIONS.VIEW_STUDENT]);
@@ -40,9 +110,33 @@ export const createStudentAction = async (input: TCreateStudentInput): Promise<T
   const existingEmail = await StudentRepository.findByEmail(input.email);
   if (existingEmail) throw new BadRequestException("Email sudah terdaftar");
 
-  const newStudent = await StudentRepository.create(input);
+  const defaultPassword = await bcrypt.hash(input.nis, 10);
 
-  return StudentDTO.toResponse(newStudent);
+  const result = await prismaActive.$transaction(async (tx) => {
+    const student = await tx.student.create({
+      data: {
+        nis: input.nis,
+        name: input.name,
+        email: input.email,
+        classId: input.classId,
+      },
+      include: { class: true },
+    });
+
+    await tx.user.create({
+      data: {
+        email: input.email,
+        password: defaultPassword,
+        name: input.name,
+        role: "STUDENT",
+        studentId: student.id,
+      },
+    });
+
+    return student;
+  });
+
+  return StudentDTO.toResponse(result);
 };
 
 export const updateStudentAction = async (input: TUpdateStudentInput): Promise<TStudentResponse> => {

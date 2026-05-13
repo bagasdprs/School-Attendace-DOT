@@ -9,43 +9,33 @@ import { PERMISSIONS } from "@/common/enum/permission.enum";
 import { prismaActive } from "@/libs/prisma/prisma";
 import { AttendanceStatus } from "@prisma/client";
 
-/**
- * Helper untuk mengambil StudentId dari Session User yang login
- */
 const getStudentIdFromSession = async (userId: string): Promise<bigint> => {
   const user = await prismaActive.user.findUnique({ where: { id: BigInt(userId) } });
   if (!user || !user.studentId) throw new UnauthorizedException();
   return user.studentId;
 };
 
-/**
- * Helper untuk mendapatkan tanggal hari ini tanpa jam (Midnight UTC)
- */
 const getTodayDate = () => {
   const today = new Date();
   return new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
 };
 
 export const checkInAction = async (input: TCheckInInput): Promise<TAttendanceResponse> => {
-  const session = await serverCheckPermission([PERMISSIONS.CHECKIN_ATTENDANCE]); // [cite: 136]
+  const session = await serverCheckPermission([PERMISSIONS.CHECKIN_ATTENDANCE]);
   const studentId = await getStudentIdFromSession(session.userId);
   const today = getTodayDate();
 
-  // 1. Validasi sudah check-in
   const existing = await AttendanceRepository.findByStudentAndDate(studentId, today);
   if (existing) throw new BadRequestException("Anda sudah melakukan check-in hari ini");
 
-  // 2. Ambil Active Setting [cite: 137]
   const activeSetting = await prismaActive.attendanceSetting.findFirst({ where: { isActive: true } });
   if (!activeSetting) throw new BadRequestException("Sistem absensi belum dikonfigurasi oleh Admin");
 
-  // 3. Calculate Status
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
   const [setHour, setMinute] = activeSetting.checkInTime.split(":").map(Number);
   const settingMinutes = setHour * 60 + setMinute;
 
-  // LATE jika melebihi threshold, PRESENT jika tepat waktu [cite: 135]
   const status = currentMinutes > settingMinutes + activeSetting.lateThreshold ? AttendanceStatus.LATE : AttendanceStatus.PRESENT;
 
   const attendance = await AttendanceRepository.create({
@@ -60,7 +50,7 @@ export const checkInAction = async (input: TCheckInInput): Promise<TAttendanceRe
 };
 
 export const checkOutAction = async (input: TCheckOutInput): Promise<TAttendanceResponse> => {
-  const session = await serverCheckPermission([PERMISSIONS.CHECKOUT_ATTENDANCE]); // [cite: 136]
+  const session = await serverCheckPermission([PERMISSIONS.CHECKOUT_ATTENDANCE]);
   const studentId = await getStudentIdFromSession(session.userId);
   const today = getTodayDate();
 
@@ -76,14 +66,40 @@ export const checkOutAction = async (input: TCheckOutInput): Promise<TAttendance
   return AttendanceDTO.toResponse(updated);
 };
 
+// export const getAttendancesAction = async (query: TGetAttendancesQuery) => {
+//   const session = await serverCheckPermission([PERMISSIONS.VIEW_ATTENDANCE]);
+
+//   if (session.role === "STUDENT") {
+//     const user = await prismaActive.user.findUnique({
+//       where: { id: BigInt(session.userId) },
+//     });
+
+//     if (user?.studentId) {
+//       query.studentId = user.studentId;
+//     }
+//   }
+
+//   const { data, meta } = await AttendanceRepository.findMany(query);
+//   return { data: AttendanceDTO.toResponseList(data), meta };
+// };
 export const getAttendancesAction = async (query: TGetAttendancesQuery) => {
-  await serverCheckPermission([PERMISSIONS.VIEW_ATTENDANCE]); // [cite: 136]
+  const session = await serverCheckPermission([PERMISSIONS.VIEW_ATTENDANCE]);
+
+  // LOGIKA ISOLASI
+  if (session.role === "STUDENT") {
+    const user = await prismaActive.user.findUnique({ where: { id: BigInt(session.userId) } });
+    if (user?.studentId) {
+      // PAKSA query menggunakan studentId dia sendiri
+      query.studentId = user.studentId;
+    }
+  }
+
   const { data, meta } = await AttendanceRepository.findMany(query);
   return { data: AttendanceDTO.toResponseList(data), meta };
 };
 
 export const markAbsenceAction = async (input: TMarkAbsenceInput): Promise<TAttendanceResponse> => {
-  await serverCheckPermission([PERMISSIONS.MANAGE_ATTENDANCE]); // [cite: 136]
+  await serverCheckPermission([PERMISSIONS.MANAGE_ATTENDANCE]);
 
   const targetDate = new Date(input.date);
   const existing = await AttendanceRepository.findByStudentAndDate(input.studentId, targetDate);
@@ -100,7 +116,7 @@ export const markAbsenceAction = async (input: TMarkAbsenceInput): Promise<TAtte
 };
 
 export const updateAttendanceAction = async (input: TUpdateAttendanceInput): Promise<TAttendanceResponse> => {
-  await serverCheckPermission([PERMISSIONS.MANAGE_ATTENDANCE]); // [cite: 136]
+  await serverCheckPermission([PERMISSIONS.MANAGE_ATTENDANCE]);
 
   const existing = await AttendanceRepository.findById(input.id);
   if (!existing) throw new NotFoundException("Data absensi tidak ditemukan");

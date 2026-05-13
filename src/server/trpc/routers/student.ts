@@ -1,8 +1,12 @@
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { CreateStudentSchema, GetStudentByIdSchema, GetStudentsQuerySchema, UpdateStudentSchema } from "@/server/student/validations/student.validation";
-import { createStudentAction, deleteStudentAction, getStudentByIdAction, getStudentsAction, updateStudentAction } from "@/server/student/actions/student.action";
+import { createStudentAction, deleteStudentAction, getDashboardSummaryAction, getStudentByIdAction, getStudentsAction, updateStudentAction } from "@/server/student/actions/student.action";
 
 export const studentRouter = createTRPCRouter({
+  getDashboardSummary: publicProcedure.query(async () => {
+    return await getDashboardSummaryAction();
+  }),
+
   getStudents: publicProcedure.input(GetStudentsQuerySchema).query(async ({ input }) => {
     return await getStudentsAction(input);
   }),

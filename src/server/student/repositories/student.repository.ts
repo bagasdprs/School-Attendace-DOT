@@ -19,10 +19,10 @@ export const StudentRepository = {
         where,
         include: { class: true },
         orderBy: {
-          [sortBy || "createdAt"]: sortOrder,
+          createdAt: "desc",
         },
       })
-      .withPages({ limit: perPage, page });
+      .withPages({ limit: query.perPage, page: query.page });
 
     return { data: data as TStudentEntity[], meta };
   },

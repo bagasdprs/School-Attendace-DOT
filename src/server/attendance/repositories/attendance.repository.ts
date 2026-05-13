@@ -5,10 +5,11 @@ import { TAttendanceEntity } from "../dtos/attendance.dto";
 
 export const AttendanceRepository = {
   async findMany(query: TGetAttendancesQuery) {
-    const { page, perPage, studentId, date, status, sortBy, sortOrder } = query;
+    const { page, perPage, studentId, classId, date, status, sortBy, sortOrder } = query;
 
     const where: Prisma.AttendanceWhereInput = {
       ...(studentId && { studentId }),
+      ...(classId && { student: { classId } }),
       ...(date && { date: new Date(date) }),
       ...(status && { status }),
     };
