@@ -29,9 +29,10 @@ export const AttendanceRepository = {
 
   // Penting untuk mengecek apakah siswa sudah check-in hari ini
   async findByStudentAndDate(studentId: bigint, date: Date): Promise<TAttendanceEntity | null> {
-    return await prisma.attendance.findUnique({
+    return await prisma.attendance.findFirst({
       where: {
-        studentId_date: { studentId, date },
+        studentId: studentId,
+        date: date,
       },
       include: { student: { include: { class: true } } },
     });

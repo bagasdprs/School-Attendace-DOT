@@ -12,9 +12,11 @@ export const RecapRepository = {
     });
   },
 
-  async getClassWithAttendances(classId: bigint, startDate: Date, endDate: Date, status?: AttendanceStatus) {
+  async getClassWithAttendances(classId: bigint | undefined, startDate: Date, endDate: Date, status?: AttendanceStatus) {
     return await prismaActive.student.findMany({
-      where: { classId },
+      where: {
+        ...(classId && { classId }),
+      },
       include: {
         class: true,
         attendances: {

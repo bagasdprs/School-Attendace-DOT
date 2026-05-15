@@ -124,7 +124,7 @@ function MasterClassPage() {
       </Card>
 
       <Card bordered={false} className="shadow-sm ring-1 ring-gray-100" styles={{ body: { padding: 0 } }}>
-        <Table columns={columns} dataSource={classes?.data} loading={isLoading} rowKey="id" pagination={{ pageSize: 10 }} />
+        <Table columns={columns} dataSource={classes?.data} loading={isLoading} rowKey="id" pagination={{ pageSize: 10 }} scroll={{ x: "max-content" }} />
       </Card>
 
       <Modal title={editingId ? "Edit Data Kelas" : "Tambah Kelas Baru"} open={isModalOpen} onCancel={handleCancel} footer={null} centered>

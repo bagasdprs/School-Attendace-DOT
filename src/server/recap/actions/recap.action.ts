@@ -41,7 +41,6 @@ export const getStudentRecapAction = async (input: TGetStudentRecapInput): Promi
 
   let targetStudentId = input.studentId;
 
-  // 🚨 LOGIKA ISOLASI: Jika dia STUDENT, paksa gunakan studentId miliknya sendiri
   if (session.role === "STUDENT") {
     const user = await prismaActive.user.findUnique({ where: { id: BigInt(session.userId) } });
     if (user?.studentId) {
@@ -71,14 +70,12 @@ export const getClassRecapAction = async (input: TGetClassRecapInput): Promise<T
 
   let targetClassId = input.classId;
   let studentsWithAttendances: any[] = [];
-  let classData = { id: BigInt(0), name: "-" };
+  let classData = { id: BigInt(0), name: "Semua Kelas" };
 
   const start = new Date(input.startDate);
   const end = new Date(input.endDate);
 
-  // 🚨 LOGIKA ISOLASI DAN PERCABANGAN ROLE
   if (session.role === "STUDENT") {
-    // A. JIKA SISWA: Cari tahu kelasnya secara otomatis dan ambil datanya saja
     const user = await prismaActive.user.findUnique({
       where: { id: BigInt(session.userId) },
       include: { student: { include: { class: true } } },
@@ -89,31 +86,23 @@ export const getClassRecapAction = async (input: TGetClassRecapInput): Promise<T
       classData = { id: targetClassId, name: user.student.class?.name || "Kelas" };
 
       const rawData = await RecapRepository.getClassWithAttendances(targetClassId, start, end, input.status);
-
-      // Filter array-nya! Buang semua siswa lain, sisakan data miliknya sendiri
       studentsWithAttendances = rawData.filter((student) => student.id === user.studentId);
     }
   } else {
-    // B. JIKA ADMIN: Pengecekan classId normal
-    if (!targetClassId) {
-      // Kembalikan data default jika filter Kelas belum dipilih Admin
-      return {
-        classId: "",
-        className: "-",
-        period: `${input.startDate} - ${input.endDate}`,
-        classSummary: calculateSummary([]),
-        students: [],
-      };
+    if (targetClassId) {
+      const dbClass = await RecapRepository.getClassInfo(targetClassId);
+      if (!dbClass) throw new NotFoundException("Data kelas tidak ditemukan");
+      classData = dbClass;
     }
 
-    const dbClass = await RecapRepository.getClassInfo(targetClassId);
-    if (!dbClass) throw new NotFoundException("Data kelas tidak ditemukan");
-    classData = dbClass;
-
-    studentsWithAttendances = await RecapRepository.getClassWithAttendances(targetClassId, start, end, input.status);
+    studentsWithAttendances = await RecapRepository.getClassWithAttendances(targetClassId ?? BigInt(0), start, end, input.status);
   }
 
-  // 4. Kalkulasi Summary Berdasarkan Array yang Sudah Difilter
+  if (input.search) {
+    const keyword = input.search.toLowerCase();
+    studentsWithAttendances = studentsWithAttendances.filter((student) => student.name.toLowerCase().includes(keyword));
+  }
+
   let classTotalAttendances: { status: AttendanceStatus }[] = [];
   const studentsSummary: TStudentRecapResponse[] = studentsWithAttendances.map((student) => {
     classTotalAttendances = classTotalAttendances.concat(student.attendances);
@@ -137,7 +126,6 @@ export const getClassRecapAction = async (input: TGetClassRecapInput): Promise<T
 export const exportClassRecapAction = async (input: TGetClassRecapInput): Promise<string> => {
   await serverCheckPermission([PERMISSIONS.EXPORT_RECAP]);
 
-  // Ini akan otomatis ter-isolasi karena memanggil getClassRecapAction yang sudah dilindungi di atas
   const data = await getClassRecapAction(input);
 
   let csv = `Laporan Kehadiran Kelas ${data.className}\n`;

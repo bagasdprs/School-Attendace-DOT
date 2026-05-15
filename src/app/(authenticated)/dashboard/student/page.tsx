@@ -146,7 +146,7 @@ function MasterStudentPage() {
       </Card>
 
       <Card bordered={false} className="shadow-sm ring-1 ring-gray-100" styles={{ body: { padding: 0 } }}>
-        <Table columns={columns} dataSource={students?.data} loading={isLoading} rowKey="id" />
+        <Table columns={columns} dataSource={students?.data} loading={isLoading} rowKey="id" scroll={{ x: "max-content" }} />
       </Card>
 
       <Modal title={editingId ? "Edit Profil Siswa" : "Registrasi Siswa Baru"} open={isModalOpen} onCancel={handleCancel} footer={null} centered>

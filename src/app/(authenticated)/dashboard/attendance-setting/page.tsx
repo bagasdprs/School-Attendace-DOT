@@ -145,7 +145,7 @@ function AttendanceSettingPage() {
       </div>
 
       <Card bordered={false} className="shadow-sm ring-1 ring-gray-100" styles={{ body: { padding: 0 } }}>
-        <Table dataSource={settings?.data} columns={columns} loading={isLoading} rowKey="id" pagination={false} />
+        <Table dataSource={settings?.data} columns={columns} loading={isLoading} rowKey="id" pagination={false} scroll={{ x: "max-content" }} />
       </Card>
 
       <Modal title="Konfigurasi Waktu Absensi" open={isModalOpen} onCancel={handleCancel} footer={null} width={600}>

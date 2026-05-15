@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { Table, Typography, Card, Row, Col, DatePicker, Select, Button, Space, Progress } from "antd";
-import { FileSearchOutlined, DownloadOutlined, InfoCircleOutlined, BarChartOutlined, TeamOutlined } from "@ant-design/icons";
+import { Table, Typography, Card, Row, Col, DatePicker, Select, Button, Space, Progress, Input } from "antd";
+import { FileSearchOutlined, DownloadOutlined, InfoCircleOutlined, BarChartOutlined, TeamOutlined, SearchOutlined } from "@ant-design/icons";
 import { trpc } from "@/utils/trpc";
 import dayjs from "dayjs";
 import StatCard from "@/app/(authenticated)/_components/StatCard";
@@ -15,39 +15,26 @@ function RecapPage() {
   const isStudent = user?.role === "STUDENT";
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([dayjs().startOf("month"), dayjs().endOf("month")]);
   const [classId, setClassId] = useState<string | undefined>(undefined);
+  const [searchName, setSearchName] = useState("");
 
   const { data: classes } = trpc.class.getClasses.useQuery(
     {},
     {
-      enabled: !isStudent,
+      enabled: user?.role === "ADMIN",
     },
   );
-
-  interface TClassRecapResponse {
-    overallPercentage: number;
-    grandTotalAbsent: number;
-    grandTotalLate: number;
-    students: {
-      studentId: string;
-      studentName: string;
-      totalPresent: number;
-      totalLate: number;
-      totalExcused: number;
-      totalAbsent: number;
-      attendancePercentage: number;
-    }[];
-  }
 
   const { data: recapData, isLoading } = trpc.recap.getClassRecap.useQuery({
     startDate: dateRange[0].format("YYYY-MM-DD"),
     endDate: dateRange[1].format("YYYY-MM-DD"),
     classId: classId as any,
+    search: searchName,
   });
 
-  const stats = recapData as TClassRecapResponse | undefined;
+  const stats = recapData;
 
   const handleExport = () => {
-    window.open(`/api/export/recap?classId=${classId || ""}&start=${dateRange[0].format("YYYY-MM-DD")}&end=${dateRange[1].format("YYYY-MM-DD")}`, "_blank");
+    window.open(`/api/export/recap?classId=${classId || ""}&start=${dateRange[0].format("YYYY-MM-DD")}&end=${dateRange[1].format("YYYY-MM-DD")}&search=${searchName}`, "_blank");
   };
 
   const columns = [
@@ -61,25 +48,25 @@ function RecapPage() {
         </Text>
       ),
     },
-    { title: "Hadir", dataIndex: "totalPresent", key: "totalPresent", align: "center" as const },
+    { title: "Hadir", dataIndex: "present", key: "present", align: "center" as const },
     {
       title: "Terlambat",
-      dataIndex: "totalLate",
-      key: "totalLate",
+      dataIndex: "late",
+      key: "late",
       align: "center" as const,
       render: (val: number) => <Text type="warning">{val}</Text>,
     },
     {
       title: "Izin/Sakit",
-      dataIndex: "totalExcused",
-      key: "totalExcused",
+      dataIndex: "excused",
+      key: "excused",
       align: "center" as const,
       render: (val: number) => <Text type="secondary">{val}</Text>,
     },
     {
       title: "Alpa",
-      dataIndex: "totalAbsent",
-      key: "totalAbsent",
+      dataIndex: "absent",
+      key: "absent",
       align: "center" as const,
       render: (val: number) => <Text type="danger">{val}</Text>,
     },
@@ -88,11 +75,14 @@ function RecapPage() {
       dataIndex: "attendancePercentage",
       key: "attendancePercentage",
       width: 250,
-      render: (percent: number) => (
-        <Space size="middle">
-          <Progress percent={percent} size="small" strokeColor={percent > 80 ? "#1D9B5E" : percent > 50 ? "#faad14" : "#ff4d4f"} />
-        </Space>
-      ),
+      render: (percentStr: string) => {
+        const percent = parseFloat(percentStr) || 0;
+        return (
+          <Space size="middle">
+            <Progress percent={percent} size="small" strokeColor={percent > 80 ? "#1D9B5E" : percent > 50 ? "#faad14" : "#ff4d4f"} format={(p) => `${p}%`} />
+          </Space>
+        );
+      },
     },
   ];
 
@@ -113,45 +103,53 @@ function RecapPage() {
 
       <Card bordered={false} className="shadow-sm ring-1 ring-gray-100">
         <Row gutter={[16, 16]} align="bottom">
-          <Col xs={24} md={10}>
+          <Col xs={24} md={8}>
             <Text className="mb-2 block font-medium text-gray-600">Rentang Waktu:</Text>
             <RangePicker className="w-full" size="large" value={dateRange} onChange={(dates) => dates && setDateRange([dates[0]!, dates[1]!])} />
           </Col>
+
           {!isStudent && (
-            <Col xs={24} md={8}>
-              <Text className="mb-2 block font-medium text-gray-600">Filter Kelas:</Text>
-              <Select className="w-full" size="large" placeholder="Semua Kelas" allowClear onChange={setClassId}>
-                {classes?.data?.map((c) => (
-                  <Select.Option key={c.id} value={c.id}>
-                    {c.name}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Col>
+            <>
+              <Col xs={24} md={6}>
+                <Text className="mb-2 block font-medium text-gray-600">Filter Kelas:</Text>
+                <Select className="w-full" size="large" placeholder="Semua Kelas" allowClear onChange={setClassId}>
+                  {classes?.data?.map((c) => (
+                    <Select.Option key={c.id} value={c.id}>
+                      {c.name}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Col>
+
+              <Col xs={24} md={6}>
+                <Text className="mb-2 block font-medium text-gray-600">Cari Siswa:</Text>
+                <Input placeholder="Ketik nama..." prefix={<SearchOutlined className="text-gray-400" />} size="large" allowClear onChange={(e) => setSearchName(e.target.value)} />
+              </Col>
+            </>
           )}
-          <Col xs={24} md={6}>
+
+          <Col xs={24} md={isStudent ? 16 : 4}>
             <Button type="primary" block size="large" icon={<FileSearchOutlined />} className="bg-dot-500">
-              Terapkan Filter
+              Terapkan
             </Button>
           </Col>
         </Row>
       </Card>
 
-      {/* Grid Statistik - Fix Error Properti */}
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={8}>
-          <StatCard title="Rata-rata Kehadiran" value={`${stats?.overallPercentage || 0}%`} icon={<TeamOutlined />} valueColor="text-dot-500" />
+          <StatCard title="Rata-rata Kehadiran" value={stats?.classSummary?.attendancePercentage || "0%"} icon={<TeamOutlined />} valueColor="text-dot-500" />
         </Col>
         <Col xs={24} sm={8}>
-          <StatCard title="Total Alpa" value={stats?.grandTotalAbsent || 0} icon={<InfoCircleOutlined />} valueColor="text-red-500" />
+          <StatCard title="Total Alpa" value={stats?.classSummary?.absent || 0} icon={<InfoCircleOutlined />} valueColor="text-red-500" />
         </Col>
         <Col xs={24} sm={8}>
-          <StatCard title="Total Terlambat" value={stats?.grandTotalLate || 0} icon={<BarChartOutlined />} valueColor="text-orange-500" />
+          <StatCard title="Total Terlambat" value={stats?.classSummary?.late || 0} icon={<BarChartOutlined />} valueColor="text-orange-500" />
         </Col>
       </Row>
 
       <Card bordered={false} className="shadow-sm ring-1 ring-gray-100" title={<span className="text-lg font-semibold">Laporan Per Siswa</span>} styles={{ body: { padding: 0 } }}>
-        <Table dataSource={stats?.students} columns={columns} loading={isLoading} rowKey="studentId" />
+        <Table dataSource={stats?.students} columns={columns} loading={isLoading} rowKey="studentId" scroll={{ x: "max-content" }} />
       </Card>
     </div>
   );

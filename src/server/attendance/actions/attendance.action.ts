@@ -66,22 +66,6 @@ export const checkOutAction = async (input: TCheckOutInput): Promise<TAttendance
   return AttendanceDTO.toResponse(updated);
 };
 
-// export const getAttendancesAction = async (query: TGetAttendancesQuery) => {
-//   const session = await serverCheckPermission([PERMISSIONS.VIEW_ATTENDANCE]);
-
-//   if (session.role === "STUDENT") {
-//     const user = await prismaActive.user.findUnique({
-//       where: { id: BigInt(session.userId) },
-//     });
-
-//     if (user?.studentId) {
-//       query.studentId = user.studentId;
-//     }
-//   }
-
-//   const { data, meta } = await AttendanceRepository.findMany(query);
-//   return { data: AttendanceDTO.toResponseList(data), meta };
-// };
 export const getAttendancesAction = async (query: TGetAttendancesQuery) => {
   const session = await serverCheckPermission([PERMISSIONS.VIEW_ATTENDANCE]);
 
@@ -89,7 +73,6 @@ export const getAttendancesAction = async (query: TGetAttendancesQuery) => {
   if (session.role === "STUDENT") {
     const user = await prismaActive.user.findUnique({ where: { id: BigInt(session.userId) } });
     if (user?.studentId) {
-      // PAKSA query menggunakan studentId dia sendiri
       query.studentId = user.studentId;
     }
   }

@@ -40,20 +40,16 @@ import bcrypt from "bcrypt";
 // };
 export const getDashboardSummaryAction = async () => {
   const session = await serverCheckPermission([PERMISSIONS.VIEW_STUDENT]);
+  const now = new Date();
+  const todayUTC = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  // LOGIKA ISOLASI: Jika dia STUDENT, hitung statistik khusus untuk dia saja
   if (session.role === "STUDENT") {
-    // Ambil studentId dari user yang login
     const user = await prismaActive.user.findUnique({ where: { id: BigInt(session.userId) } });
     const studentId = user?.studentId;
 
     if (!studentId) return { totalStudents: 0, totalAbsentOrExcused: 0, totalLate: 0 };
 
-    // Hitung absensi HANYA untuk studentId ini (misal dalam sebulan terakhir)
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const startOfMonth = new Date(todayUTC.getFullYear(), todayUTC.getMonth(), 1);
 
     const [myTotalPresent, myTotalAbsent, myTotalLate] = await Promise.all([
       prismaActive.attendance.count({ where: { studentId, date: { gte: startOfMonth }, status: "PRESENT" } }),
@@ -71,8 +67,18 @@ export const getDashboardSummaryAction = async () => {
   // Jika ADMIN, jalankan kode lama (hitung seluruh sekolah)
   const [totalStudents, totalAbsentOrExcused, totalLate] = await Promise.all([
     prismaActive.student.count(),
-    prismaActive.attendance.count({ where: { date: today, status: { in: ["ABSENT", "EXCUSED"] } } }),
-    prismaActive.attendance.count({ where: { date: today, status: "LATE" } }),
+    prismaActive.attendance.count({
+      where: {
+        date: todayUTC, // 👈 Pastikan menggunakan todayUTC
+        status: { in: ["ABSENT", "EXCUSED"] },
+      },
+    }),
+    prismaActive.attendance.count({
+      where: {
+        date: todayUTC, // 👈 Pastikan menggunakan todayUTC
+        status: "LATE",
+      },
+    }),
   ]);
 
   return { totalStudents, totalAbsentOrExcused, totalLate };

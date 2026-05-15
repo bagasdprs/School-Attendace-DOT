@@ -12,15 +12,16 @@ interface StatCardProps {
 
 function StatCard({ title, value, icon, valueColor, suffix }: StatCardProps) {
   return (
-    <Card bordered={false} className="h-full shadow-sm ring-1 ring-gray-100 transition-all hover:shadow-md">
+    <Card variant="borderless" className="h-full shadow-sm ring-1 ring-gray-100 transition-all hover:shadow-md">
       <Statistic
         title={<span className="font-medium text-gray-500">{title}</span>}
         value={value}
         prefix={<span className={`mr-2 ${valueColor}`}>{icon}</span>}
-        valueStyle={{
-          fontWeight: "bold",
-          color: valueColor.includes("text-") ? undefined : valueColor,
-        }}
+        styles={{ content: { color: valueColor } }}
+        // valueStyle={{
+        //   fontWeight: "bold",
+        //   color: valueColor.includes("text-") ? undefined : valueColor,
+        // }}
         suffix={suffix}
       />
     </Card>

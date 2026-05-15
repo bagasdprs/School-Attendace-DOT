@@ -17,9 +17,10 @@ export const GetStudentRecapSchema = DateRangeSchema.extend({
 });
 
 export const GetClassRecapSchema = DateRangeSchema.extend({
-  // Cukup tambahkan classId saja. startDate, endDate, dan status otomatis terbawa dari DateRangeSchema
   classId: z.coerce.bigint({ message: "ID Kelas tidak valid" }).optional(),
+  search: z.string().optional(),
 });
 
 export type TGetStudentRecapInput = z.infer<typeof GetStudentRecapSchema>;
 export type TGetClassRecapInput = z.infer<typeof GetClassRecapSchema>;
+// export type TRecapInput = TGetStudentRecapInput | TGetClassRecapInput;
