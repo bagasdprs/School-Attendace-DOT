@@ -30,7 +30,7 @@ export default function AppHeader({ collapsed, setCollapsed, userName, isMobile,
     },
   ];
 
-  // Logic klik Hamburger: Buka Drawer (Mobile) atau Ciutkan Sider (Desktop)
+  // Logic klik Hamburger
   const handleMenuClick = () => {
     if (isMobile) {
       setDrawerOpen(true);

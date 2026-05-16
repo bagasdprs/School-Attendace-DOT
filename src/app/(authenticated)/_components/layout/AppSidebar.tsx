@@ -91,8 +91,8 @@ export default function AppSidebar({ collapsed, setCollapsed, userRole, isMobile
   const sidebarContent = (
     <div className="flex h-full flex-col bg-white">
       <div className="flex flex-col justify-center px-6 py-6 text-center">
-        <h1 className={`font-extrabold text-dot-700 transition-all ${!isMobile && collapsed ? "text-xl" : "text-2xl"}`}>{!isMobile && collapsed ? "EA" : "EduAttend"}</h1>
-        {(!collapsed || isMobile) && <span className="mt-1 text-xs font-medium text-dot-500">{userRole === "ADMIN" ? "Administrator" : "Siswa Dashboard"}</span>}
+        <h1 className={`font-extrabold text-dot-700 transition-all ${!isMobile && collapsed ? "text-xl" : "text-2xl"}`}>{!isMobile && collapsed ? "DE" : "Dotify EDU"}</h1>
+        {(!collapsed || isMobile) && <span className="mt-1 text-xs font-medium text-dot-500">{userRole === "ADMIN" ? "Administrator" : "Dashboard Siswa"}</span>}
       </div>
 
       <Menu
